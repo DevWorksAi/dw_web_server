@@ -3,6 +3,29 @@ use serde::{
     Serialize,
 };
 
+use std::fmt;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum ProtocolError {
+    InvalidMessage,
+    MessageError,
+    UserJoinedError,
+    UserLeftError,
+    AuthenticateError(authenticate::Error),
+}
+
+impl fmt::Display for ProtocolError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ProtocolError::InvalidMessage => write!(f, "Mensagem inválida"),
+            ProtocolError::MessageError => write!(f, "Erro ao tentar enviar mensagem"),
+            ProtocolError::UserJoinedError => write!(f, "Erro ao tentar ao adicionar usuário ao chat"),
+            ProtocolError::UserLeftError => write!(f, "Erro ao tentar remover usuário do chat"),
+            ProtocolError::AuthenticateError(e) => write!(f, "Erro de autenticação: {e}"),
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
 pub enum ClientProtocol {
@@ -11,10 +34,16 @@ pub enum ClientProtocol {
 
     #[serde(rename = "join_chat")]
     JoinChat { username: String },
+
+    #[serde(rename = "request_authenticate")]
+    RequestAuthenticate { username: String, password: String },
+
+    #[serde(rename = "add_user")]
+    AddUser { username: String, password: String },
+
     /* 
     Protocols a implementar:
     RequestFeed,
-    ReqAuthenticate
     */
 }
 
@@ -31,11 +60,16 @@ pub enum ServerProtocol {
     UserLeft { username: String },
 
     #[serde(rename = "error")]
-    Error { message: String },
+    Error { error: ProtocolError },
+
+    #[serde(rename = "authenticated")]
+    Authenticated,
+
+    #[serde(rename = "user_added")]
+    UserAdded,
 
     /* 
     Protocols a implementar:
     Feed,
-    Authenticate
     */
 }

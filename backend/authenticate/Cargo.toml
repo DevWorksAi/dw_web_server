@@ -1,0 +1,11 @@
+[package]
+name = "authenticate"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+argon2 = "0.5.3"
+dotenvy = "0.15.7"
+rand = { version = "0.8", features = ["std"] }
+serde = "1.0.219"
+sqlx = { version = "0.8.6", features = ["runtime-tokio", "mysql", "macros"] }

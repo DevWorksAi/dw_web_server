@@ -1,0 +1,8 @@
+[package]
+name = "utils"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+sqlx = { version = "0.8.6", features = ["runtime-tokio", "mysql"] }
+tokio = { version = "1.45.1", features = ["full"] }

@@ -32,10 +32,35 @@ async fn main() {
 
     let (mut write, mut read) = socket.split();
 
+    let (username, password) = (String::from("Artur"), String::from("1234"));
+
+    // apague o comentario para tentar adicionar algum usuario,
+    // basta mudar (username, password) ali em cima
+    // write
+    //     .send(Message::Text(
+    //         serde_json::to_string(&ClientProtocol::AddUser {
+    //             username: username.clone(),
+    //             password: password.clone(),
+    //         }).unwrap().into()
+    //     ))
+    //     .await
+    //     .expect("Erro ao enviar mensagem");
+
+
+    write
+        .send(Message::Text(
+            serde_json::to_string(&ClientProtocol::RequestAuthenticate {
+                username: username.clone(),
+                password: password.clone(),
+            }).unwrap().into()
+        ))
+        .await
+        .expect("Erro ao enviar mensagem");
+
     write.
         send(Message::Text(
             serde_json::to_string(&ClientProtocol::JoinChat {
-                username: "rust_bot_noggers".into(),
+                username,
             }).unwrap().into()
         ))
         .await
@@ -96,8 +121,17 @@ async fn main() {
                         println!("{username} saiu da conversa");
                     },
 
-                    Ok(ServerProtocol::Error { message }) => {
-                        println!("{message}");
+                    Ok(ServerProtocol::Authenticated) => {
+                        println!("Usuário autenticado com sucesso");
+                    },
+
+                    Ok(ServerProtocol::UserAdded) => {
+                        println!("Usuário adicionado no banco de dados");
+                    },
+
+                    Ok(ServerProtocol::Error { error }) => {
+                        println!("Erro -> {error}");
+                        break;
                     },
 
                     Err(_) => {

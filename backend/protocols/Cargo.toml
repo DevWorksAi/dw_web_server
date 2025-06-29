@@ -4,4 +4,5 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+authenticate = { version = "0.1.0", path = "../authenticate" }
 serde = { version = "1.0.219", features = ["derive"] }
