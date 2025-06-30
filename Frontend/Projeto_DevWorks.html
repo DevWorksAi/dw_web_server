@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Projeto DevWorks</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header>
+    <div class="container">
+      <nav class="menu">
+        <ul class="menu-left">
+          <div><a  href="#"><h3>DevWorks_Chat</h3></a><div>
+        </ul>
+        <ul class="menu-right">
+          <li><a href="#">Feed</a></li>
+          <li><a href="#sobre">Sobre</a></li>
+          <li><div class="menu-usuario-btn" id="menu-usuario-btn">Usuário </div></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Menu do usuário -->
+  <nav class="menu-usuario" id="menu-usuario">
+    <ul>
+      <li>
+        <div id="btn-config" class="btn-config">⚙️ Configurações</div>
+        <ul id="lista-config" class="lista-config">
+          <li><button id="alterar-nome">Alterar Nome de Usuário</button></li>
+        </ul>
+      </li>
+      <li><a href="#">Log out</a></li>
+    </ul>
+  </nav>
+
+  <div class="main-content">
+    <aside class="sidebar">
+      <h2>Conversas</h2>
+      <ul>
+        <li><a href="#">Chat 1</a></li>
+        <li><a href="#">Chat 2</a></li>
+      </ul>
+    </aside>
+
+    <section class="chat">
+      <h2>Chat Ativo</h2>
+      <div class="messages">
+        <!-- Mensagens aparecerão aqui -->
+      </div>
+      <div class="chat-input-area">
+        <input type="text" class="chat-input" placeholder="Mensagem" />
+        <button class="send-button">Enviar</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
