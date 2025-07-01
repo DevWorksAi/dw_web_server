@@ -1,0 +1,10 @@
+[package]
+name = "error"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+argon2 = "0.5.3"
+dotenvy = "0.15.7"
+serde = "1.0.219"
+sqlx = "0.8.6"

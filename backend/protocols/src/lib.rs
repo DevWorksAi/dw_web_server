@@ -3,43 +3,21 @@ use serde::{
     Serialize,
 };
 
-use std::fmt;
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum ProtocolError {
-    InvalidMessage,
-    MessageError,
-    UserJoinedError,
-    UserLeftError,
-    AuthenticateError(authenticate::Error),
-}
-
-impl fmt::Display for ProtocolError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ProtocolError::InvalidMessage => write!(f, "Mensagem inválida"),
-            ProtocolError::MessageError => write!(f, "Erro ao tentar enviar mensagem"),
-            ProtocolError::UserJoinedError => write!(f, "Erro ao tentar ao adicionar usuário ao chat"),
-            ProtocolError::UserLeftError => write!(f, "Erro ao tentar remover usuário do chat"),
-            ProtocolError::AuthenticateError(e) => write!(f, "Erro de autenticação: {e}"),
-        }
-    }
-}
+use error::{
+	ProtocolError
+};
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
 pub enum ClientProtocol {
     #[serde(rename = "send_message")]
-    SendMessage { text: String },
-
-    #[serde(rename = "join_chat")]
-    JoinChat { username: String },
+    SendMessage { from: String, to: String, text: String },
 
     #[serde(rename = "request_authenticate")]
     RequestAuthenticate { username: String, password: String },
 
-    #[serde(rename = "add_user")]
-    AddUser { username: String, password: String },
+    #[serde(rename = "create_user")]
+    CreateUser { username: String, password: String },
 
     /* 
     Protocols a implementar:
@@ -51,13 +29,10 @@ pub enum ClientProtocol {
 #[serde(tag = "type")]
 pub enum ServerProtocol {
     #[serde(rename = "message")]
-    Message { username: String, text: String },
+    Message { from: String, to: String, text: String },
 
-    #[serde(rename = "user_joined")]
-    UserJoined { username: String },
-
-    #[serde(rename = "user_left")]
-    UserLeft { username: String },
+    #[serde(rename = "user_disconnected")]
+    UserDisconnected { username: String },
 
     #[serde(rename = "error")]
     Error { error: ProtocolError },
@@ -65,8 +40,8 @@ pub enum ServerProtocol {
     #[serde(rename = "authenticated")]
     Authenticated,
 
-    #[serde(rename = "user_added")]
-    UserAdded,
+    #[serde(rename = "user_created")]
+    UserCreated,
 
     /* 
     Protocols a implementar:

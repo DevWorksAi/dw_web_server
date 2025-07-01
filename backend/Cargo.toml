@@ -2,8 +2,7 @@
 resolver = "2"
 
 members = [ 
-	"authenticate",
-	"client", 
+	"client", "error", 
 	"protocols",
-	"server", "utils",
+	"server", "users", "utils",
 ]

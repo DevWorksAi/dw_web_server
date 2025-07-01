@@ -33,19 +33,19 @@ async fn main() {
     let (mut write, mut read) = socket.split();
 
     let (username, password) = (String::from("Artur"), String::from("1234"));
+    // let (username, password) = (String::from("nyoxon"), String::from("1234"));
 
     // apague o comentario para tentar adicionar algum usuario,
     // basta mudar (username, password) ali em cima
     // write
     //     .send(Message::Text(
-    //         serde_json::to_string(&ClientProtocol::AddUser {
+    //         serde_json::to_string(&ClientProtocol::CreateUser {
     //             username: username.clone(),
     //             password: password.clone(),
     //         }).unwrap().into()
     //     ))
     //     .await
     //     .expect("Erro ao enviar mensagem");
-
 
     write
         .send(Message::Text(
@@ -56,15 +56,6 @@ async fn main() {
         ))
         .await
         .expect("Erro ao enviar mensagem");
-
-    write.
-        send(Message::Text(
-            serde_json::to_string(&ClientProtocol::JoinChat {
-                username,
-            }).unwrap().into()
-        ))
-        .await
-        .unwrap();
 
     println!("conectastesse ao melhr chat of the world seloko (CTRL + D para sair)");
 
@@ -89,7 +80,11 @@ async fn main() {
                                 continue;
                             }
 
-                            let msg = ClientProtocol::SendMessage { text: line };
+                            let msg = ClientProtocol::SendMessage {
+                                from: username.clone(),
+                                to: String::from("nyoxon"),
+                                text: line,
+                            };
                             let json = serde_json::to_string(&msg).unwrap();
 
                             write
@@ -109,15 +104,11 @@ async fn main() {
         while let Some(Ok(msg)) = read.next().await {
             if let Message::Text(json) = msg {
                 match serde_json::from_str::<ServerProtocol>(&json) {
-                    Ok(ServerProtocol::Message { username, text }) => {
-                        println!("{username}: {text}");
+                    Ok(ServerProtocol::Message { from, to: _, text }) => {
+                        println!("from {from}: {text}");
                     },
 
-                    Ok(ServerProtocol::UserJoined { username }) => {
-                        println!("{username} entrou na conversa!");
-                    },
-
-                    Ok(ServerProtocol::UserLeft { username }) => {
+                    Ok(ServerProtocol::UserDisconnected { username }) => {
                         println!("{username} saiu da conversa");
                     },
 
@@ -125,7 +116,7 @@ async fn main() {
                         println!("Usuário autenticado com sucesso");
                     },
 
-                    Ok(ServerProtocol::UserAdded) => {
+                    Ok(ServerProtocol::UserCreated) => {
                         println!("Usuário adicionado no banco de dados");
                     },
 

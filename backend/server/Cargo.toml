@@ -4,9 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-authenticate = { version = "0.1.0", path = "../authenticate" }
 protocols = { version = "0.1.0", path = "../protocols" }
 axum = { version = "0.8.4", features = ["ws"] }
 futures-util = "0.3.31"
 serde_json = "1.0.140"
 tokio = { version = "1.45.1", features = ["full"] }
+error = { version = "0.1.0", path = "../error" }
+users = { version = "0.1.0", path = "../users" }

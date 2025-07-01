@@ -3,29 +3,30 @@ use std::{
 };
 
 use tokio::{
-    sync::broadcast,
     io::Result,
 };
 
 use axum::{
     Router,
     routing::any,
-    Extension,
 };
 
 use server::{
     handler,
 };
 
+use users::{
+    Users,
+};
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    // cria o broadcast (single sender, multiple consumer)
-    let (tx, _) = broadcast::channel::<String>(16);
+    let users = Users::new();
 
     // cria a estrutura do server
-    let app = Router::<()>::new()
+    let app = Router::new()
         .route("/ws", any(handler))
-        .layer(Extension(tx));
+        .with_state(users);
 
     // ouve via tcp no endereço dado
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
