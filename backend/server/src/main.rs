@@ -12,7 +12,7 @@ use axum::{
 };
 
 use server::{
-    handler,
+    handle::handle_connections::handler,
 };
 
 use users::{

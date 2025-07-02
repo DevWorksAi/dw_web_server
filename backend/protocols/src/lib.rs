@@ -4,8 +4,41 @@ use serde::{
 };
 
 use error::{
-	ProtocolError
+	ProtocolError,
 };
+
+use std::future::Future;
+
+pub trait Protocol: Sized + Serialize + for<'de> Deserialize<'de> {
+    fn serialize_and<R, F, Fut>(self, f: F) -> 
+        impl Future<Output = Result<R, ProtocolError>> + Send
+    where
+        Self: Serialize + Send + Sized + 'static,
+        F: FnOnce(String) -> Fut + Send,
+        Fut: Future<Output = R> + Send,
+        R: Send,
+    {
+        async move {
+            let string = serde_json::to_string(&self)?;
+            let result = f(string).await;
+            Ok(result)
+        }
+    }
+
+    fn deserialize_and<R, F, Fut>(s: &str, f: F) -> 
+        impl Future<Output = Result<R, ProtocolError>> + Send
+    where
+        F: FnOnce(Self) -> Fut + Send,
+        Fut: Future<Output = R> + Send,
+        R: Send,
+    {   
+        async move {
+            let val = serde_json::from_str(s)?;
+            let result = f(val).await;
+            Ok(result)
+        }
+    }
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
@@ -48,3 +81,6 @@ pub enum ServerProtocol {
     Feed,
     */
 }
+
+impl Protocol for ClientProtocol {}
+impl Protocol for ServerProtocol {}

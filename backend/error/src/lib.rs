@@ -56,6 +56,7 @@ impl fmt::Display for AuthenticateErrorType {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ProtocolError {
+    Serde,
     InvalidMessage,
     MessageError,
     UserJoinedError,
@@ -63,6 +64,12 @@ pub enum ProtocolError {
     UserNotExist,
     UserOffline,
     AuthenticateError(AuthenticateErrorType),
+}
+
+impl From<serde_json::Error> for ProtocolError {
+    fn from(_: serde_json::Error) -> Self {
+        Self::Serde
+    }
 }
 
 impl fmt::Display for ProtocolError {
@@ -75,6 +82,7 @@ impl fmt::Display for ProtocolError {
             ProtocolError::UserNotExist => write!(f, "Usuário inexistente"),
             ProtocolError::UserOffline => write!(f, "Usuário offline"),
             ProtocolError::AuthenticateError(e) => write!(f, "Erro de autenticação: {e}"),
+            ProtocolError::Serde => write!(f, "Erro ao tentar serializar/deserializar uma mensagem"),
         }
     }
 }
