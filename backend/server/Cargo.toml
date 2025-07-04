@@ -11,3 +11,4 @@ serde_json = "1.0.140"
 tokio = { version = "1.45.1", features = ["full"] }
 error = { version = "0.1.0", path = "../error" }
 users = { version = "0.1.0", path = "../users" }
+types = { version = "0.1.0", path = "../types" }

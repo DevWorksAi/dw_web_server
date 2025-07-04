@@ -125,6 +125,10 @@ async fn main() {
                         break;
                     },
 
+                    Ok(ServerProtocol::Success) => {
+                        println!("Sucesso em alguma operação bizarra 'o'");
+                    }
+
                     Err(_) => {
                         println!("algum problema nada poggers aconteceukkk");
                     },

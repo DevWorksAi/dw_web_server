@@ -1,3 +1,8 @@
+/*
+Funções com propósito geral. Essas funções devem ser
+chamadas em /utils/src/main.rs
+*/
+
 use sqlx::{
     mysql::MySqlPoolOptions,
     Executor,
@@ -8,6 +13,11 @@ use std::{
     path::PathBuf,
 };
 
+// Cria automaticamente, se não existir, a database de nome
+// db_name no ip host e porta port. Além de dar permissões 
+// de acceso ao database pro db_user e criar as tabelas 
+// importantes dentrodo database.
+// (atualmente só cria a de user/password)
 pub async fn init_mysql_database(
     root_user: &str,
     root_pass: &str,

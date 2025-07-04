@@ -1,3 +1,9 @@
+/*
+Aqui estão implementados os tipos de erro
+para o tratamento e propagação de erros durante 
+o programa inteiro se tornar mais idiomático.
+*/
+
 use serde::{
     Deserialize,
     Serialize,
@@ -7,6 +13,7 @@ use std::{
     fmt,
 };
 
+// Erros relacionados a database mysql e usuários.
 #[derive(Debug, Serialize, Deserialize)]
 pub enum AuthenticateErrorType {
     Std,
@@ -54,6 +61,8 @@ impl fmt::Display for AuthenticateErrorType {
     }
 }
 
+// Erro genérico que contêm todos
+// os erros possíveis usados nesse programa.
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ProtocolError {
     Serde,
@@ -66,11 +75,13 @@ pub enum ProtocolError {
     AuthenticateError(AuthenticateErrorType),
 }
 
+
 impl From<serde_json::Error> for ProtocolError {
     fn from(_: serde_json::Error) -> Self {
         Self::Serde
     }
 }
+
 
 impl fmt::Display for ProtocolError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

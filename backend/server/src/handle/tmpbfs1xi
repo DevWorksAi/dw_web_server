@@ -1,0 +1,122 @@
+use axum::extract::ws::Message;
+
+use futures_util::sink::SinkExt;
+
+use error::{ProtocolError};
+
+use protocols::{
+    ClientProtocol, 
+    ServerProtocol,
+    Protocol,
+};
+
+use users::{
+    Users,
+    User,
+};
+
+use types::{ArcWriter, Tx, ArcUser, ArcUsers};
+
+pub async fn handle_protocol
+(
+    protocol: ClientProtocol,
+    user: ArcUser,
+    users: ArcUsers,
+    tx: Tx,
+    write: ArcWriter,
+    addr: SocketAddr,
+)
+{
+    match protocol {
+        ClientProtocol::SendMessage { from, to, text } => {
+            // se alguem pode enviar mensagem significa
+            // que ele já está autenticado, e portanto
+            // está no hashmap de users
+            // agora se "to" não está no hash, entao
+            // um erro é retornado
+
+            let reply = ServerProtocol::Message {
+                from,
+                to: to.clone(),
+                text,
+            };
+
+            let result = reply.serialize_and(async |json| {
+                let users = users.lock().await;
+                let on_users = users.on_users.lock().await;
+
+                if let Some(target) = on_users.get(&User::new(&to)) {
+                    drop(user); // libera o mutex antes de send
+                    let _ = target.send(json.into());
+                } else {
+                    drop(user);
+                    drop(on_users);
+
+                    let err = ServerProtocol::Error {
+                        error: ProtocolError::UserNotExist,
+                    };
+
+                    let result = err.serialize_and(async |json| {
+                        ServerProtocol::try_send(writer.clone()).await;
+                        ServerProtocol::Success;
+                    }).await;
+
+                    ServerProtocol::handle_result(result, writer).await;
+                }
+            }).await;
+        },
+
+        ClientProtocol::RequestAuthenticate { username, password } => {
+            *user.lock().await = User::new(&username);
+            let mut users = users.lock().await;
+
+            match users.authenticate_user(&username, &password, tx).await {
+                Ok(()) => {
+                    drop(users);
+                    let authenticated = ServerProtocol::Authenticated;
+
+                    let _ = authenticated.serialize_and(async |json| {
+                        S
+                    }).await;
+                },
+                Err(e) => {
+                    drop(users);
+                    let err = ServerProtocol::Error {
+                        error: ProtocolError::AuthenticateError(e),
+                    };
+
+                    let _ = err.serialize_and(async |json| {
+                        let mut writer = write.lock().await;
+                        let _ = writer.send(Message::Text(json.into())).await;
+                    }).await;
+                }
+
+            }
+        },
+
+        ClientProtocol::CreateUser {username, password} => {
+            match Users::add_user(&username, &password).await {
+                Ok(()) => {
+                    let added = ServerProtocol::UserCreated;
+
+                    let _ = added.serialize_and(async |json| {
+                        let mut writer = write.lock().await;
+                        let _ = writer.send(Message::Text(json.into())).await;
+                    }).await;
+                },
+
+                Err(e) => {
+                    let err = ServerProtocol::Error {
+                        error: ProtocolError::AuthenticateError(e),
+                    };
+
+                    let _ = err.serialize_and(async |json| {
+                        let mut writer = write.lock().await;
+                        let _ = writer.send(Message::Text(json.into())).await;
+                    }).await;
+                }
+            }
+        },
+    }
+}
+

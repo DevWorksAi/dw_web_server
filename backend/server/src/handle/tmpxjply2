@@ -1,0 +1,182 @@
+use axum::extract::ws::Message;
+
+use futures_util::sink::SinkExt;
+
+use error::{ProtocolError};
+
+use protocols::{
+    ClientProtocol, 
+    ServerProtocol,
+    Protocol,
+};
+
+use users::{
+    Users,
+    User,
+};
+
+use std::net::SocketAddr;
+
+use types::{ArcWriter, Tx, ArcUser, ArcUsers};
+
+pub async fn handle_protocol
+(
+    protocol: ClientProtocol,
+    user: ArcUser,
+    users: ArcUsers,
+    tx: Tx,
+    writer: ArcWriter,
+    addr: SocketAddr,
+)
+{
+    match protocol {
+        ClientProtocol::SendMessage { from, to, text } => {
+            // se alguem pode enviar mensagem significa
+            // que ele já está autenticado, e portanto
+            // está no hashmap de users
+            // agora se "to" não está no hash, entao
+            // um erro é retornado
+
+            let reply = ServerProtocol::Message {
+                from,
+                to: to.clone(),
+                text,
+            };
+
+            let result = reply.serialize_and(async |json| {
+                let users = users.lock().await;
+                let on_users = users.on_users.lock().await;
+
+                if let Some(target) = on_users.get(&User::new(&to)) {
+                    drop(user); // libera o mutex antes de send
+                    let _ = target.send(json.into());
+                    ServerProtocol::Success
+                } else {
+                    drop(user);
+                    drop(on_users);
+
+                    let err = ServerProtocol::Error {
+                        error: ProtocolError::UserNotExist,
+                    };
+
+                    handle_instance(writer.clone(), err, addr).await;
+                    ServerProtocol::Success
+                }
+            }).await;
+
+            handle_result(writer, result, addr).await;
+        },
+
+        ClientProtocol::RequestAuthenticate { username, password } => {
+            *user.lock().await = User::new(&username);
+            let mut users = users.lock().await;
+
+            match users.authenticate_user(&username, &password, tx).await {
+                Ok(()) => {
+                    drop(users);
+                    let authenticated = ServerProtocol::Authenticated;
+
+                    handle_instance(writer, authenticated, addr).await;
+                },
+                Err(e) => {
+                    drop(users);
+                    let err = ServerProtocol::Error {
+                        error: ProtocolError::AuthenticateError(e),
+                    };
+
+                    handle_instance(writer, err, addr).await;
+                }
+            }
+        },
+
+        ClientProtocol::CreateUser {username, password} => {
+            match Users::add_user(&username, &password).await {
+                Ok(()) => {
+                    let added = ServerProtocol::UserCreated;
+
+                    handle_instance(writer, added, addr).await;
+                },
+
+                Err(e) => {
+                    let err = ServerProtocol::Error {
+                        error: ProtocolError::AuthenticateError(e),
+                    };
+
+                    handle_instance(writer, err, addr).await;
+                }
+            }
+        },
+    }
+}
+
+async fn handle_instance
+(
+    writer: ArcWriter,
+    instance: ServerProtocol,
+    addr: SocketAddr,
+)
+{
+    let result = instance.serialize_and(async |json| {
+        try_send(
+            writer.clone(), 
+            &json, 
+            addr).await;
+        ServerProtocol::Success
+    }).await;
+
+    handle_result(writer, result, addr).await;    
+}
+
+async fn handle_result
+(
+    writer: ArcWriter,
+    r: Result<ServerProtocol, ProtocolError>,
+    addr: SocketAddr
+)
+{
+    match r {
+        Ok(protocol) => {
+            match protocol {
+                ServerProtocol::Success => return,
+                _ => {
+                    p
+                    let result = protocol.serialize_and(async |json| {
+                        try_send(writer, &json, addr).await;
+                    }).await;
+
+                    if result.is_err() {
+                        eprintln!("Erro de serialização");
+                    }
+                }
+            }
+        },
+        Err(e) => {
+            let err = ServerProtocol::Error {
+                error: e,
+            };
+
+            let result = err.serialize_and(async |json| {
+                try_send(writer, &json, addr).await;
+            }).await;
+
+            if result.is_err() {
+                eprintln!("Erro de serialização");
+            }
+        }
+    }
+}
+
+async fn try_send
+(
+    writer: ArcWriter,
+    to_send: &str,
+    addr: SocketAddr,
+) 
+{
+    let mut writer = writer.lock().await;
+    if writer.send(Message::Text(to_send.into())).await.is_err() {
+        let _ = writer.close().await;
+        eprintln!(
+            "Conexão fechada com {addr:?}; motivo: erro ao tentar enviar pela socket");
+    }
+}

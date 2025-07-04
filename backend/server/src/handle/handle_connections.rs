@@ -23,12 +23,8 @@ use futures_util::{
     stream::StreamExt,
 };
 
-use error::ProtocolError;
-
-
 use protocols::{
     ClientProtocol, 
-    ServerProtocol,
     Protocol,
 };
 
@@ -38,9 +34,10 @@ use users::{
 };
 
 use crate::handle::handle_protocols::handle_protocol;
-use crate::handle::types::{Tx, Rx, ArcReader,
+use types::{Tx, Rx, ArcReader,
                            ArcWriter, ArcUser, ArcUsers};
 
+// Responsável por lidar com o Https recebido do client
 pub async fn handler
 (
     ws: WebSocketUpgrade,
@@ -48,11 +45,15 @@ pub async fn handler
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
 ) -> Response 
 {
-    // se o HTTPS vier com a tag UPGRADE, aprimora
+    // Se o HTTPS vier com a tag UPGRADE, aprimora
     // o WebSocketUpgrade em um WebSocket
     ws.on_upgrade(move |socket| handle_socket(socket, users, addr))
 }
 
+// Função principal para leitura e envio de 
+// dados pela socket especificamente. Um channel
+// também é criado, mas ele é tratado por outras
+// funções que handle_socket chama.
 pub async fn handle_socket
 (
     socket: WebSocket,
@@ -61,7 +62,7 @@ pub async fn handle_socket
 )
 {
     println!("client conectado: {addr}");
-    // adiciona um novo consumidor
+    // Cria a socket e o channel.
     let (tx, rx): (Tx, Rx) = unbounded_channel();
     let (write, read) = socket.split();
 
@@ -70,32 +71,39 @@ pub async fn handle_socket
     let user = Arc::new(Mutex::new(User::new("")));
     let users = Arc::new(Mutex::new(users));
 
-    // task responsável por enviar ao broadcast
+    // Task responsável pela leitura
     let tx_task = tokio::spawn(receive_from_socket(
         Arc::clone(&reader),
-        Arc::clone(&writer),
         Arc::clone(&user),
         Arc::clone(&users),
         tx.clone(),
     ));
 
-    // task responsável por ler do broadcast
+    // Task responsável pelo envio
     let rx_task = tokio::spawn(send_to_socket(
-        Arc::clone(&writer),
+        writer,
         rx,
+        addr,
     ));
 
-    // espera até uma das duas tasks terminar primeiro
+    // Espera até uma das duas tasks acima criadas
+    // terem terminado, cancelando de forma segura
+    // a outra.
     tokio::select! {
         _ = tx_task => {}
         _ = rx_task => {}
     }
+
+    println!("client desconectado: {addr:?}");
+    let mut users = users.lock().await;
+    let user = user.lock().await;
+    users.remove_user(&*user.username).await;
 }
 
+// Função responsável pela leitura de dados.
 async fn receive_from_socket
 (
     reader: ArcReader,
-    writer: ArcWriter,
     user: ArcUser,
     users: ArcUsers,
     tx: Tx,
@@ -105,38 +113,32 @@ async fn receive_from_socket
 
     while let Some(Ok(msg)) = reader.next().await {
         if let Message::Text(text) = msg {
-            match serde_json::from_str::<ClientProtocol>(&text) {
-                Ok(protocol) => handle_protocol(
-                                    protocol, 
-                                    user.clone(),
-                                    users.clone(),
-                                    tx.clone(),
-                                    writer.clone(),
-                                ).await,
-                Err(_) => {
-                    let err = ServerProtocol::Error {
-                        error: ProtocolError::InvalidMessage,
-                    };
-
-                    let _ = err.serialize_and(async |json| {
-                        let mut writer = writer.lock().await;
-                        let _ = writer.send(json.into());
-                    }).await;
-                }
-            } 
+            let _ = ClientProtocol
+            ::deserialize_and(&text, async |protocol| {
+                handle_protocol(
+                        protocol, 
+                        user.clone(),
+                        users.clone(),
+                        tx.clone(),
+                ).await;             
+            }).await;
         }
     }
 }
 
+// Função responsável pelo envio de dados.
 async fn send_to_socket
 (
     writer: ArcWriter,
     mut rx: Rx,
+    addr: SocketAddr,
 )
 {
     while let Some(msg) = rx.recv().await {
         let mut writer = writer.lock().await;
         if writer.send(msg).await.is_err() {
+            let _ = writer.close().await;
+            eprintln!("Conexão com {addr:?} foi fechada");
             break;
         }
     }
