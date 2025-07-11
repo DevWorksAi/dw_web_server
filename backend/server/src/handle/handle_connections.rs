@@ -33,9 +33,14 @@ use users::{
     User,
 };
 
-use crate::handle::handle_protocols::handle_protocol;
+use crate::handle::handle_protocols::{
+    handle_protocol,
+    handle_internal,
+};
+
 use types::{Tx, Rx, ArcReader,
-                           ArcWriter, ArcUser, ArcUsers};
+    ArcWriter, ArcUser, ArcUsers,
+    TxInt, RxInt};
 
 // Responsável por lidar com o Https recebido do client
 pub async fn handler
@@ -64,6 +69,7 @@ pub async fn handle_socket
     println!("client conectado: {addr}");
     // Cria a socket e o channel.
     let (tx, rx): (Tx, Rx) = unbounded_channel();
+    let (txi, rxi): (TxInt, RxInt) = unbounded_channel();
     let (write, read) = socket.split();
 
     let reader = Arc::new(Mutex::new(read));
@@ -77,6 +83,13 @@ pub async fn handle_socket
         Arc::clone(&user),
         Arc::clone(&users),
         tx.clone(),
+        txi.clone(),
+    ));
+
+    // Task responsável pelo canal interno
+    let int_channel_task = tokio::spawn(handle_internal_channel(
+        Arc::clone(&users),
+        rxi,
     ));
 
     // Task responsável pelo envio
@@ -92,6 +105,7 @@ pub async fn handle_socket
     tokio::select! {
         _ = tx_task => {}
         _ = rx_task => {}
+        _ = int_channel_task => {}
     }
 
     println!("client desconectado: {addr:?}");
@@ -107,6 +121,7 @@ async fn receive_from_socket
     user: ArcUser,
     users: ArcUsers,
     tx: Tx,
+    txi: TxInt,
 )
 {  
     let mut reader = reader.lock().await;
@@ -120,6 +135,7 @@ async fn receive_from_socket
                         user.clone(),
                         users.clone(),
                         tx.clone(),
+                        txi.clone(),
                 ).await;             
             }).await;
         }
@@ -141,5 +157,19 @@ async fn send_to_socket
             eprintln!("Conexão com {addr:?} foi fechada");
             break;
         }
+    }
+}
+
+async fn handle_internal_channel
+(
+    users: ArcUsers,
+    mut rx: RxInt,
+)
+{
+    while let Some(msg) = rx.recv().await {
+        handle_internal(
+            msg,
+            users.clone(),
+        ).await;
     }
 }

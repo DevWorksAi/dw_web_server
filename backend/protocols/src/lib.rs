@@ -117,5 +117,9 @@ pub enum ServerProtocol {
     */
 }
 
+pub enum InternalProtocol {
+    OfflineMessage { username: String }
+}
+
 impl Protocol for ClientProtocol {}
 impl Protocol for ServerProtocol {}

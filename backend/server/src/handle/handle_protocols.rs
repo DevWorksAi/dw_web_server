@@ -1,17 +1,17 @@
-use error::{ProtocolError};
-
 use protocols::{
     ClientProtocol, 
-    ServerProtocol,
-    Protocol,
+    InternalProtocol,
 };
 
-use users::{
-    Users,
-    User,
+use types::{Tx, TxInt, ArcUser, ArcUsers};
+
+use crate::handle::match_protocol::client::{
+    send_message,
+    request_authenticate,
+    create_user,
 };
 
-use types::{Tx, ArcUser, ArcUsers};
+use crate::handle::match_protocol::internal::offline_message;
 
 // Lida com ClientProtocol's enviados pelo client.
 pub async fn handle_protocol
@@ -20,6 +20,7 @@ pub async fn handle_protocol
     user: ArcUser,
     users: ArcUsers,
     tx: Tx,
+    txi: TxInt,
 )
 {   
     // Os drops explícitos são usadas para
@@ -28,147 +29,50 @@ pub async fn handle_protocol
     // bloquear o valor por mais tempo que o necessário.
     match protocol {
         ClientProtocol::SendMessage { from, to, text } => {
-            // Se alguém pode enviar mensagem significa
-            // que ele já está autenticado e, portanto
-            // está no hashmap de users. (é obrigação
-            // do client garantir que o usuário esteja autenticado).
-            // Agora se "to" não está no hash, entao
-            // um erro é retornado (por enquanto).
-
-            let reply = ServerProtocol::Message {
+            send_message(
                 from,
-                to: to.clone(),
+                to,
                 text,
-            };
-
-            let result = reply.serialize_and(async |json| {
-                let users = users.lock().await;
-
-                if let Some(target) = users.get_user(User::new(&to))
-                .await 
-                {
-                    drop(user);
-
-                    try_send(target.clone(), &json).await;
-                    ServerProtocol::Success
-                } else {
-                    drop(user);
-
-                    let err = ServerProtocol::Error {
-                        error: ProtocolError::UserNotExist,
-                    };
-
-                    handle_instance(tx.clone(), err).await;
-                    ServerProtocol::Success
-                }
-            }).await;
-
-            handle_result(tx, result).await;
+                users,
+                tx,
+            ).await
         },
 
         ClientProtocol::RequestAuthenticate { username, password } => {
-            *user.lock().await = User::new(&username);
-            let mut users = users.lock().await;
-
-            match users.authenticate_user(&username, &password, tx.clone()).await {
-                Ok(()) => {
-                    drop(users);
-                    let authenticated = ServerProtocol::Authenticated;
-
-                    handle_instance(tx, authenticated).await;
-                },
-                Err(e) => {
-                    drop(users);
-                    let err = ServerProtocol::Error {
-                        error: ProtocolError::AuthenticateError(e),
-                    };
-
-                    handle_instance(tx, err).await;
-                }
-            }
+            request_authenticate(
+                username,
+                password,
+                user,
+                users,
+                tx,
+                txi,
+            ).await
         },
 
         ClientProtocol::CreateUser {username, password} => {
-            match Users::add_user(&username, &password).await {
-                Ok(()) => {
-                    let added = ServerProtocol::UserCreated;
-
-                    handle_instance(tx, added).await;
-                },
-
-                Err(e) => {
-                    let err = ServerProtocol::Error {
-                        error: ProtocolError::AuthenticateError(e),
-                    };
-
-                    handle_instance(tx, err).await;
-                }
-            }
+            create_user(
+                username,
+                password,
+                tx,
+            ).await
         },
     }
 }
 
-// Lida com cada tipo de ServerProtocol criado
-// dentro de handle_protocol();
-async fn handle_instance
-(
-    tx: Tx,
-    instance: ServerProtocol,
-)
-{   
-    // Se protocol conseguir ser enviado
-    // então ele será enviado pelo try_send,
-    // por isso o uso não é considerado o caso
-    // Ok() em handle_result, afinal sabemos
-    // com certeza que será um Success.
-    let result = instance.serialize_and(async |json| {
-        try_send(
-            tx.clone(), 
-            &json).await;
-        ServerProtocol::Success
-    }).await;
 
-    handle_result(tx, result).await;    
-}
-
-// Lida com o result retornado por serialize_and usado
-// em handle_instance();
-async fn handle_result
+pub async fn handle_internal
 (
-    tx: Tx,
-    r: Result<ServerProtocol, ProtocolError>,
+    protocol: InternalProtocol,
+    users: ArcUsers,
 )
 {
-    if let Err(e) = r {
-        let err = ServerProtocol::Error {
-            error: e,
-        };
-
-        let result = err.serialize_and(async |json| {
-            try_send(tx, &json).await;
-        }).await;
-
-        // Isto é importante! Não estou enviando para
-        // o cliente erros do tipo Serde, mas apenas
-        // imprimindo na saída de erro padrão do servidor.
-        // Portanto, caso no futuro algo estranho aconteça enquanto
-        // o servidor está online, é inteligente verificar
-        // a stderr do server.
-        if result.is_err() {
-            eprintln!("Erro de serialização");
+    match protocol {
+        InternalProtocol::OfflineMessage { username } => {
+            offline_message(
+                username,
+                users,
+            ).await
         }
     }
 }
 
-// Tenta enviar to_send pela socket
-async fn try_send
-(
-    tx: Tx,
-    to_send: &str,
-) 
-{
-    if tx.send(to_send.into()).is_err() {
-        eprintln!(
-        "Erro ao tentar enviar pelo channel; Motivo: rx foi dropado");
-    }
-}

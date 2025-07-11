@@ -24,6 +24,8 @@ pub enum AuthenticateErrorType {
     UserNotFound,
     UserNotAdded,
     UserAlreadyExists,
+    OfflineMessageError,
+    UserTxNotExist,
 }
 
 impl From<argon2::password_hash::Error> for AuthenticateErrorType {
@@ -57,6 +59,8 @@ impl fmt::Display for AuthenticateErrorType {
             AuthenticateErrorType::UserNotFound => write!(f, "Usuário não encontrado"),
             AuthenticateErrorType::UserNotAdded => write!(f, "Usuário não foi cadastrado"),
             AuthenticateErrorType::UserAlreadyExists => write!(f, "Usuário já está cadastrado"),
+            AuthenticateErrorType::OfflineMessageError => write!(f, "Erro ao tentar guardar mensagem offline"),
+            AuthenticateErrorType::UserTxNotExist => write!(f, "Sender do user não existe"),
         }
     }
 }

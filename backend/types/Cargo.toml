@@ -6,5 +6,6 @@ edition = "2024"
 [dependencies]
 axum = { version = "0.8.4", features = ["ws"] }
 futures-util = "0.3.31"
+protocols = { version = "0.1.0", path = "../protocols" }
 tokio = "1.46.0"
 users = { version = "0.1.0", path = "../users" }

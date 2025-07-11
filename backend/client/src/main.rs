@@ -57,7 +57,7 @@ async fn main() {
         .await
         .expect("Erro ao enviar mensagem");
 
-    println!("conectastesse ao melhr chat of the world seloko (CTRL + D para sair)");
+    println!("conectastesse ao melhr chat of the world seloko (CTRL + C para sair)");
 
     let cancel = CancellationToken::new();
     let cancel_sender = cancel.clone();
@@ -129,8 +129,8 @@ async fn main() {
                         println!("Sucesso em alguma operação bizarra 'o'");
                     }
 
-                    Err(_) => {
-                        println!("algum problema nada poggers aconteceukkk");
+                    Err(e) => {
+                        println!("algum problema nada poggers aconteceukkk {e}");
                     },
                 }
             }

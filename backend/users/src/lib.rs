@@ -39,12 +39,12 @@ use error::{
 
 type Tx = UnboundedSender<Message>;
 
+// Tipo de usuário para tornar o código idiomático
 #[derive(Eq, Hash, PartialEq, Clone)]
 pub struct User {
     pub username: String,
 }
 
-// Tipo de usuário para tornar o código idiomático
 impl User {
     pub fn new(username: &str) -> Self {
         Self {
@@ -131,6 +131,27 @@ impl Users {
         on_users.remove(&User::new(username))        
     }
 
+    pub async fn user_exists
+    (
+        username: &str
+    ) -> Result<bool, AuthenticateErrorType>
+    {
+        let pool = Self::connect_to_database().await?;
+
+        let result = sqlx::query_scalar!(
+            r#"
+            SELECT EXISTS(
+                SELECT 1 FROM users WHERE username = ?
+            ) AS "exists!"
+            "#,
+            username,            
+        )
+        .fetch_one(&pool)
+        .await?;
+
+        Ok(result == 1)
+    }
+
     // Faz o hash da senha passada pelo usuário
     // na hora da criação da conta.
     fn hash_password
@@ -160,6 +181,7 @@ impl Users {
             .is_ok()
         )
     }
+
 
     // Função responsável por autenticar/autorizar a entrada
     // do usuário na rede.
@@ -193,5 +215,76 @@ impl Users {
         } else {
             Err(AuthenticateErrorType::UserNotFound)
         }
+    }
+
+    pub async fn store_message
+    (
+        sender: &str,
+        receiver: &str,
+        message: &str,
+    ) -> Result<(), AuthenticateErrorType>
+    {
+        let pool = Self::connect_to_database().await?;
+
+        match sqlx::query!(
+            r#"
+            INSERT INTO offline_messages (sender, receiver, message)
+            VALUES (?, ?, ?)
+            "#,
+            sender,
+            receiver,
+            message,
+        )
+        .fetch_optional(&pool)
+        .await {
+            Ok(_) => Ok(()),
+            Err(_) => Err(AuthenticateErrorType::OfflineMessageError)
+        }
+    }
+
+    pub async fn get_stored_messages
+    (
+        receiver: &str,
+    ) -> Result<Vec<(String, String)>, AuthenticateErrorType>
+    {
+        let pool = Self::connect_to_database().await?;
+
+        let rows = sqlx::query!(
+            r#"
+            SELECT id, sender, message FROM offline_messages
+            WHERE receiver = ?
+            ORDER BY sent_at ASC
+            "#,
+            receiver
+        )
+        .fetch_all(&pool)
+        .await?;
+
+        let result = rows
+            .into_iter()
+            .map(|row| (row.sender, row.message))
+            .collect::<Vec<_>>();
+
+        Ok(result)
+    }
+
+    pub async fn delete_stored_messages
+    (
+        receiver: &str,
+    ) -> Result<(), AuthenticateErrorType>
+    {
+        let pool = Self::connect_to_database().await?;
+
+        sqlx::query!(
+            r#"
+            DELETE FROM offline_messages
+            WHERE receiver = ?
+            "#,
+            receiver
+        )
+        .execute(&pool)
+        .await?;
+
+        Ok(())  
     }
 }

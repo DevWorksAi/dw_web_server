@@ -63,6 +63,19 @@ pub async fn init_mysql_database(
     "#;
     user_pool.execute(create_users_table).await?;
 
+    let create_offline_table = r#"
+        CREATE TABLE IF NOT EXISTS offline_messages (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            sender VARCHAR(255) NOT NULL,
+            receiver VARCHAR(255) NOT NULL,
+            message TEXT NOT NULL,
+            sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (sender) REFERENCES users(username) ON DELETE CASCADE,
+            FOREIGN KEY (receiver) REFERENCES users(username) ON DELETE CASCADE
+        );
+    "#;
+    user_pool.execute(create_offline_table).await?;
+
     let db_url = format!("mysql://{}:{}@{}:{}/{}", db_user, db_pass, host, port, db_name);
 
     let mut env_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
