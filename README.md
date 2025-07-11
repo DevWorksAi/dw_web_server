@@ -16,7 +16,7 @@ para o usuário com privilégios do seu sistema. Em /utils/src/main.rs basta mud
 Agora, finalmente, dentro do diretório raiz faça:
 
 ```bash
-cargo run -p utils
+make utils
 ```
 
 Outro dentro de utils:
@@ -34,7 +34,7 @@ Se tudo der errado você pode ter que acabar criando o database na mão mesmo. S
 Agora que a database foi criada e o arquivo .env existe dentro do diretorio raiz, basta fazer:
 
 ```bash
-cargo run -p server
+make server
 ```
 
 Estando no diretório raiz ou:
@@ -48,7 +48,7 @@ Estando no diretório ./server, para criar o servidor web.
 Agora em outro terminal/cmd, estando no diretório raiz, faça (se for fazer isso mesmo leia o comentário em ./client/src/main.rs):
 
 ```bash
-cargo run -p client
+make client
 ```
 
 Estando no diretório raiz ou:
